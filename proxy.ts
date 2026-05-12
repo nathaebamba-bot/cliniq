@@ -9,6 +9,8 @@ const isPublicRoute = createRouteMatcher([
   "/politique-de-confidentialite(.*)",
   "/api/webhooks/(.*)",
   "/api/trpc/(.*)",
+  "/api/cal/(.*)",
+  "/api/avis/click/(.*)",
 ])
 
 const isDashboardRoute = createRouteMatcher(["/dashboard(.*)", "/patients(.*)", "/rendez-vous(.*)", "/automatisations(.*)", "/formulaires(.*)", "/avis(.*)", "/rapports(.*)", "/parametres(.*)"])

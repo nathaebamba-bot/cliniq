@@ -1,7 +1,7 @@
 ﻿"use client"
 
-import { useState } from "react"
-import { MessageSquare, Mail, Calendar, Star, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react"
+import { useState, useEffect } from "react"
+import { MessageSquare, Mail, Calendar, Star, CheckCircle2, XCircle, Eye, EyeOff, Copy, RefreshCw, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v3"
@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 
 const twilioSchema = z.object({
@@ -102,11 +101,27 @@ function MaskedInput({ value, ...props }: React.ComponentProps<typeof Input> & {
 
 export function IntegrationsTab() {
   const utils = trpc.useUtils()
+  const [calendarUrl, setCalendarUrl] = useState<string | null>(null)
 
   const { data: org } = trpc.organisation.get.useQuery()
   const { data: integrationStatus } = trpc.organisation.integrationStatus.useQuery()
+  const { data: existingCalUrl } = trpc.organisation.getCalendarUrl.useQuery()
+  useEffect(() => {
+    if (existingCalUrl && !calendarUrl) setCalendarUrl(existingCalUrl)
+  }, [existingCalUrl, calendarUrl])
+
   const updateParametres = trpc.organisation.updateParametres.useMutation({
     onSuccess: () => { toast.success("Configuration sauvegardée."); utils.organisation.get.invalidate() },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const regenerateCalendar = trpc.organisation.regenerateCalendarToken.useMutation({
+    onSuccess: (url: string) => {
+      setCalendarUrl(url)
+      utils.organisation.integrationStatus.invalidate()
+      utils.organisation.getCalendarUrl.invalidate()
+      toast.success("Lien de calendrier généré.")
+    },
     onError: (e) => toast.error(e.message),
   })
 
@@ -139,9 +154,12 @@ export function IntegrationsTab() {
     resendForm.reset()
   }
 
+  const activeCalUrl = calendarUrl ?? existingCalUrl ?? null
+
   const hasTwilio = integrationStatus?.twilio ?? false
   const hasResend = integrationStatus?.resend ?? false
   const hasGoogle = integrationStatus?.google ?? false
+  const hasCalendar = !!(integrationStatus?.calendar || activeCalUrl)
 
   return (
     <div className="space-y-4">
@@ -212,14 +230,70 @@ export function IntegrationsTab() {
         </form>
       </IntegrationCard>
 
-      {/* Calendar placeholder */}
+      {/* Calendar webcal feed */}
       <IntegrationCard
         icon={Calendar}
-        title="Google Calendar / Outlook"
-        description="Synchronisation bidirectionnelle des rendez-vous"
-        actif={false}
+        title="Google Calendar / Outlook / Apple"
+        description="Abonnez-vous à votre calendrier de rendez-vous dans n'importe quelle app"
+        actif={hasCalendar}
       >
-        <p className="text-sm text-text-tertiary py-2">Disponible en Phase 7 — configuration OAuth requise.</p>
+        <div className="space-y-4">
+          {activeCalUrl ? (
+            <>
+              <div className="space-y-1.5">
+                <Label>Lien d&apos;abonnement (webcal)</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={activeCalUrl} className="font-mono text-xs" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeCalUrl)
+                      toast.success("Lien copié!")
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-lg bg-bg-tertiary p-3 space-y-2 text-xs text-text-secondary">
+                <p className="font-semibold text-text-primary">Comment ajouter ce calendrier :</p>
+                <p><span className="font-medium">Google Calendar :</span> Paramètres → Autres agendas → Ajouter par URL → Coller le lien</p>
+                <p><span className="font-medium">Outlook :</span> Ajouter un calendrier → S&apos;abonner à Internet → Coller le lien</p>
+                <p><span className="font-medium">iPhone / Mac :</span> Réglages → Calendrier → Comptes → Ajouter un compte → Autre → Calendrier avec abonnement</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-text-tertiary"
+                onClick={() => regenerateCalendar.mutate()}
+                disabled={regenerateCalendar.isPending}
+              >
+                {regenerateCalendar.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                Réinitialiser le lien (révoque l&apos;accès précédent)
+              </Button>
+            </>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-text-secondary">
+                Générez un lien unique pour synchroniser vos rendez-vous avec Google Calendar, Outlook ou Apple Calendar. Le lien se met à jour automatiquement — les 2 prochains mois de RDV sont inclus.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => regenerateCalendar.mutate()}
+                disabled={regenerateCalendar.isPending}
+              >
+                {regenerateCalendar.isPending
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <Calendar className="h-4 w-4 mr-2" />}
+                Générer le lien de calendrier
+              </Button>
+            </div>
+          )}
+        </div>
       </IntegrationCard>
     </div>
   )

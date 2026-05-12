@@ -1,6 +1,7 @@
 ﻿import { z } from "zod/v3"
 import { protectedProcedure, adminProcedure, createTRPCRouter } from "@/server/trpc"
 import { TypeClinique } from "@prisma/client"
+import { randomUUID } from "crypto"
 
 export const organisationRouter = createTRPCRouter({
   get: protectedProcedure.query(async ({ ctx }) => {
@@ -70,12 +71,50 @@ export const organisationRouter = createTRPCRouter({
   integrationStatus: protectedProcedure.query(async ({ ctx }) => {
     const org = await ctx.db.organisation.findUnique({
       where: { clerkOrgId: ctx.orgId },
-      include: { parametres: { select: { avisLienGoogle: true } } },
+      include: { parametres: { select: { avisLienGoogle: true, calendarToken: true } } },
     })
     return {
       twilio: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
       resend: !!(process.env.RESEND_API_KEY),
       google: !!(org?.parametres?.avisLienGoogle),
+      calendar: !!(org?.parametres?.calendarToken),
+      calendarToken: org?.parametres?.calendarToken ?? null,
     }
+  }),
+
+  getCalendarUrl: protectedProcedure.query(async ({ ctx }) => {
+    const org = await ctx.db.organisation.findUnique({
+      where: { clerkOrgId: ctx.orgId },
+      select: { id: true },
+    })
+    if (!org) return null
+
+    const params = await ctx.db.parametresClinique.findUnique({
+      where: { orgId: org.id },
+      select: { calendarToken: true },
+    })
+
+    if (!params?.calendarToken) return null
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cliniq.app"
+    return `${appUrl}/api/cal/${params.calendarToken}`
+  }),
+
+  regenerateCalendarToken: protectedProcedure.mutation(async ({ ctx }) => {
+    const org = await ctx.db.organisation.findUnique({
+      where: { clerkOrgId: ctx.orgId },
+      select: { id: true },
+    })
+    if (!org) throw new Error("Organisation introuvable")
+
+    const token = randomUUID()
+    await ctx.db.parametresClinique.upsert({
+      where: { orgId: org.id },
+      create: { orgId: org.id, calendarToken: token },
+      update: { calendarToken: token },
+    })
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cliniq.app"
+    return `${appUrl}/api/cal/${token}`
   }),
 })

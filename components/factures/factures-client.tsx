@@ -4,7 +4,7 @@ import { useState } from "react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { toast } from "sonner"
-import { Send, CheckCircle, FileText, Loader2, MoreHorizontal, Pencil, Trash2, BookOpen } from "lucide-react"
+import { Send, CheckCircle, FileText, Loader2, MoreHorizontal, Pencil, Trash2, BookOpen, Download } from "lucide-react"
 import { trpc } from "@/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -201,6 +201,9 @@ export function FacturesClient() {
                             <MoreHorizontal className="h-3.5 w-3.5" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => window.open(`/api/pdf/facture/${f.id}`, "_blank")}>
+                              <Download className="h-3.5 w-3.5 mr-2" /> Télécharger PDF
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEdit(f as unknown as FactureRow)}>
                               <Pencil className="h-3.5 w-3.5 mr-2" /> Modifier montant
                             </DropdownMenuItem>

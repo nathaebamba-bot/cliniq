@@ -23,14 +23,15 @@ export async function GET(req: Request) {
   const debut = new Date(annee, mois - 1, 1)
   const fin = new Date(annee, mois, 0, 23, 59, 59)
 
-  const [totalRdv, noShows, confirmes, avisEnvoyes, formulairesComplete, relancesEnvoyees] =
+  const [totalRdv, noShows, confirmes, avisEnvoyes, formulairesComplete, relancesEnvoyees, parametres] =
     await Promise.all([
       db.rendezVous.count({ where: { orgId: org.id, dateHeure: { gte: debut, lte: fin } } }),
       db.rendezVous.count({ where: { orgId: org.id, statut: "NO_SHOW", dateHeure: { gte: debut, lte: fin } } }),
       db.rendezVous.count({ where: { orgId: org.id, confirmeParPatient: true, dateHeure: { gte: debut, lte: fin } } }),
-      db.avisGoogle.count({ where: { orgId: org.id, createdAt: { gte: debut, lte: fin } } }),
+      db.avisGoogle.count({ where: { orgId: org.id, dateEnvoi: { gte: debut, lte: fin } } }),
       db.formulaireReponse.count({ where: { patient: { orgId: org.id }, completeLe: { gte: debut, lte: fin } } }),
       db.rendezVous.count({ where: { orgId: org.id, relanceEnvoyee: true, updatedAt: { gte: debut, lte: fin } } }),
+      db.parametresClinique.findUnique({ where: { orgId: org.id }, select: { tarifMoyenConsultation: true } }),
     ])
 
   const parSemaineRaw = await db.$queryRaw<Array<{ semaine: Date; total: bigint; noshows: bigint }>>`
@@ -48,6 +49,8 @@ export async function GET(req: Request) {
 
   const tauxNoShow = totalRdv > 0 ? Math.round((noShows / totalRdv) * 100) : 0
   const tauxConfirmation = totalRdv > 0 ? Math.round((confirmes / totalRdv) * 100) : 0
+  const tarif = parametres?.tarifMoyenConsultation ?? 150
+  const noShowsEvites = Math.max(0, confirmes - noShows)
 
   const data: RapportData = {
     nomClinique: org.nom,
@@ -56,13 +59,13 @@ export async function GET(req: Request) {
     totalRdv,
     noShows,
     tauxNoShow,
-    noShowsEvites: confirmes,
+    noShowsEvites,
     confirmes,
     tauxConfirmation,
     avisEnvoyes,
     formulairesComplete,
     relancesEnvoyees,
-    revenusRecuperes: confirmes * 150,
+    revenusRecuperes: noShowsEvites * tarif,
     parSemaine: parSemaineRaw.map((r) => ({
       semaine: format(new Date(r.semaine), "yyyy-MM-dd"),
       total: Number(r.total),
