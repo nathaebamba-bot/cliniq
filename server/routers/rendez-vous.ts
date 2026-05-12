@@ -240,7 +240,13 @@ export const rendezVousRouter = createTRPCRouter({
       const orgId = await getOrgId(ctx)
       const existing = await ctx.db.rendezVous.findFirst({ where: { id: input.id, orgId } })
       if (!existing) throw new TRPCError({ code: "NOT_FOUND" })
-      return ctx.db.rendezVous.delete({ where: { id: input.id } })
+      // Delete child records first to avoid FK constraint violations
+      await ctx.db.$transaction([
+        ctx.db.communication.deleteMany({ where: { rendezvousId: input.id } }),
+        ctx.db.facture.deleteMany({ where: { rendezvousId: input.id } }),
+        ctx.db.rendezVous.delete({ where: { id: input.id } }),
+      ])
+      return { ok: true }
     }),
 
   suggestionsIA: protectedProcedure

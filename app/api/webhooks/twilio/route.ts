@@ -40,13 +40,17 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Format de numéro invalide", { status: 400 })
   }
 
-  // 3. Find org by Twilio phone number
-  const integration = await db.integration.findFirst({
+  // 3. Find org by Twilio phone number — check all active integrations for a matching number
+  const twilioIntegrations = await db.integration.findMany({
     where: { type: "TWILIO", actif: true },
     include: { organisation: { include: { parametres: true } } },
   })
+  const matchedIntegration = twilioIntegrations.find((i) => {
+    const cfg = i.config as Record<string, unknown>
+    return cfg["phoneNumber"] === to || cfg["twilioPhoneNumber"] === to || cfg["numero"] === to
+  })
 
-  const org = integration?.organisation ?? await db.organisation.findFirst({
+  const org = matchedIntegration?.organisation ?? await db.organisation.findFirst({
     where: { telephone: to },
     include: { parametres: true },
   })
