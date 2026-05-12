@@ -1,0 +1,91 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "patients": "Patients",
+    "rendezVous": "Rendez-vous",
+    "automatisations": "Automatisations",
+    "formulaires": "Formulaires",
+    "factures": "Factures",
+    "avis": "Avis Google",
+    "rapports": "Rapports",
+    "parametres": "Paramètres"
+  },
+  "dashboard": {
+    "titre": "Tableau de bord",
+    "noShows": "No-shows",
+    "cetteSemaine": "cette semaine",
+    "rdvConfirmes": "RDV confirmés",
+    "automatiquement": "automatiquement",
+    "avisGoogle": "Avis Google",
+    "ceMois": "ce mois",
+    "revenusRecuperes": "Revenus récupérés",
+    "estimes": "estimés",
+    "aujourd'hui": "Aujourd'hui",
+    "actionsRequises": "Actions requises",
+    "activiteRecente": "Activité récente"
+  },
+  "patients": {
+    "titre": "Patients",
+    "nouveau": "Nouveau patient",
+    "recherche": "Rechercher par nom, téléphone ou courriel…",
+    "actif": "Actif",
+    "inactif": "Inactif",
+    "exportCSV": "Exporter CSV",
+    "aucunResultat": "Aucun patient trouvé."
+  },
+  "parametres": {
+    "titre": "Paramètres",
+    "clinique": "Clinique",
+    "integrations": "Intégrations",
+    "facturation": "Facturation",
+    "conformite": "Conformité Loi 25",
+    "equipe": "Équipe",
+    "sauvegarder": "Sauvegarder",
+    "sauvegardeReussie": "Paramètres sauvegardés.",
+    "nomClinique": "Nom de la clinique",
+    "typeClinique": "Type de clinique",
+    "adresse": "Adresse",
+    "ville": "Ville",
+    "codePostal": "Code postal",
+    "telephone": "Téléphone",
+    "courriel": "Courriel",
+    "siteWeb": "Site web",
+    "praticiens": "Praticiens",
+    "ajouterPraticien": "Ajouter un praticien",
+    "prenom": "Prénom",
+    "nom": "Nom",
+    "titre": "Titre",
+    "specialite": "Spécialité"
+  },
+  "types": {
+    "DENTAIRE": "Dentaire",
+    "PHYSIOTHERAPIE": "Physiothérapie",
+    "PSYCHOLOGIE": "Psychologie",
+    "MASSOTHERAPIE": "Massothérapie",
+    "OPTOMETRIE": "Optométrie",
+    "MEDECINE_GENERALE": "Médecine générale",
+    "AUTRE": "Autre"
+  },
+  "statuts": {
+    "PLANIFIE": "Planifié",
+    "CONFIRME": "Confirmé",
+    "ARRIVE": "Arrivé",
+    "COMPLETE": "Complété",
+    "NO_SHOW": "No-show",
+    "ANNULE": "Annulé",
+    "REPLANIFIE": "Replanifié"
+  },
+  "commun": {
+    "sauvegarder": "Sauvegarder",
+    "annuler": "Annuler",
+    "supprimer": "Supprimer",
+    "modifier": "Modifier",
+    "ajouter": "Ajouter",
+    "fermer": "Fermer",
+    "confirmer": "Confirmer",
+    "chargement": "Chargement…",
+    "erreur": "Une erreur est survenue.",
+    "oui": "Oui",
+    "non": "Non"
+  }
+}

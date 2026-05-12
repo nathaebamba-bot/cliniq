@@ -1,0 +1,580 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ORGANISATION (= une clinique cliente) ───────────────────────────────────
+
+model Organisation {
+  id              String       @id @default(cuid())
+  clerkOrgId      String       @unique
+  nom             String
+  type            TypeClinique
+  adresse         String?
+  ville           String?
+  codePostal      String?
+  telephone       String?
+  courriel        String?
+  siteWeb         String?
+  logoUrl         String?
+  couleurPrimaire String       @default("#2563EB")
+
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  forfait              Forfait  @default(DEMARRAGE)
+  forfaitActifDepuis   DateTime?
+  forfaitExpireA       DateTime?
+
+  parametres      ParametresClinique?
+  integrations    Integration[]
+  patients        Patient[]
+  rendezvous      RendezVous[]
+  praticiens      Praticien[]
+  formulaires     Formulaire[]
+  automatisations Automatisation[]
+  campagnes       Campagne[]
+  avisGoogle      AvisGoogle[]
+  listeAttente    ListeAttente[]
+  factures        Facture[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TypeClinique {
+  DENTAIRE
+  PHYSIOTHERAPIE
+  PSYCHOLOGIE
+  MASSOTHERAPIE
+  OPTOMETRIE
+  MEDECINE_GENERALE
+  AUTRE
+}
+
+enum Forfait {
+  DEMARRAGE
+  CROISSANCE
+  CLINIQUE_PRO
+}
+
+// ─── PARAMÈTRES CLINIQUE ─────────────────────────────────────────────────────
+
+model ParametresClinique {
+  id             String       @id @default(cuid())
+  orgId          String       @unique
+  organisation   Organisation @relation(fields: [orgId], references: [id])
+
+  rappelActif          Boolean @default(true)
+  rappelDelai48h       Boolean @default(true)
+  rappelDelai24h       Boolean @default(true)
+  rappelDelai2h        Boolean @default(false)
+  rappelCanal          Canal   @default(SMS_ET_COURRIEL)
+
+  messageSMS48h        String  @default("Bonjour {{prenom}}, rappel de votre RDV chez {{clinique}} le {{date}} à {{heure}} avec {{praticien}}. Confirmez avec 1 ou annulez avec 2.")
+  messageSMS24h        String  @default("Bonjour {{prenom}}, votre RDV est demain à {{heure}} avec {{praticien}}. À demain!")
+  messageCourriel48h   String?
+
+  formulaireActif      Boolean @default(true)
+  formulaireDelai      Int     @default(48)
+
+  avisActif            Boolean @default(true)
+  avisDelaiApresRdv    Int     @default(2)
+  avisLienGoogle       String?
+  avisMessageSMS       String  @default("Bonjour {{prenom}}, merci pour votre visite! Votre avis nous aide beaucoup: {{lien}}")
+
+  relanceActif         Boolean @default(true)
+  relanceDelaiJours    Int     @default(30)
+
+  hygieneActif         Boolean @default(false)
+  hygieneDelaiMois     Int     @default(6)
+
+  heureDebutEnvoi      String  @default("08:00")
+  heureFinEnvoi        String  @default("20:00")
+  fuseauHoraire        String  @default("America/Toronto")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Canal {
+  SMS_SEULEMENT
+  COURRIEL_SEULEMENT
+  SMS_ET_COURRIEL
+}
+
+// ─── PRATICIEN ────────────────────────────────────────────────────────────────
+
+model Praticien {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  prenom       String
+  nom          String
+  titre        String?
+  specialite   String?
+  courriel     String?
+  telephone    String?
+  couleur      String?
+  actif        Boolean      @default(true)
+
+  rendezvous   RendezVous[]
+  listeAttente ListeAttente[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── PATIENT ──────────────────────────────────────────────────────────────────
+
+model Patient {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  prenom       String
+  nom          String
+  dateNaissance DateTime?
+  sexe         Sexe?
+  telephone    String
+  courriel     String?
+  langue       Langue       @default(FR)
+
+  consentementSMS      Boolean   @default(false)
+  consentementCourriel Boolean   @default(false)
+  consentementDate     DateTime?
+
+  notes          String?
+  alertes        String?
+  actif          Boolean   @default(true)
+  nouveauPatient Boolean   @default(true)
+
+  assuranceStatut    AssuranceStatut?
+  assuranceNom       String?
+  assuranceNumPolice String?
+  assuranceNumMembre String?
+  assurancePhotoUrl  String?
+  assuranceConsente  Boolean @default(false)
+
+  rendezvous     RendezVous[]
+  formulaires    FormulaireReponse[]
+  communications Communication[]
+  avisGoogle     AvisGoogle[]
+  listeAttente   ListeAttente[]
+  factures       Facture[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, telephone])
+  @@index([orgId, nom])
+}
+
+enum Sexe {
+  M
+  F
+  AUTRE
+  NON_PRECISE
+}
+
+enum Langue {
+  FR
+  EN
+}
+
+enum AssuranceStatut {
+  OUI
+  NON
+  INCONNU
+}
+
+// ─── RENDEZ-VOUS ──────────────────────────────────────────────────────────────
+
+model RendezVous {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  patientId    String
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  praticienId  String
+  praticien    Praticien    @relation(fields: [praticienId], references: [id])
+
+  dateHeure    DateTime
+  dureeMinutes Int          @default(60)
+  typeRdv      String?
+  notes        String?
+
+  statut       StatutRdv    @default(CONFIRME)
+
+  rappel48hEnvoye  Boolean  @default(false)
+  rappel24hEnvoye  Boolean  @default(false)
+  rappel2hEnvoye   Boolean  @default(false)
+  formulaireEnvoye Boolean  @default(false)
+  avisEnvoye       Boolean  @default(false)
+
+  confirmeParPatient Boolean  @default(false)
+  confirmeLeDate     DateTime?
+
+  traitementComplete Boolean  @default(false)
+  traitementNotes    String?
+  relanceEnvoyee     Boolean  @default(false)
+
+  communications Communication[]
+  facture        Facture?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, dateHeure])
+  @@index([orgId, statut])
+  @@index([patientId])
+}
+
+enum StatutRdv {
+  PLANIFIE
+  CONFIRME
+  ARRIVE
+  COMPLETE
+  NO_SHOW
+  ANNULE
+  REPLANIFIE
+}
+
+// ─── FORMULAIRE ANAMNÈSE ──────────────────────────────────────────────────────
+
+model Formulaire {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  nom          String
+  type         TypeClinique
+  actif        Boolean      @default(true)
+
+  questions    Json
+
+  reponses     FormulaireReponse[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FormulaireReponse {
+  id           String     @id @default(cuid())
+  formulaireId String
+  formulaire   Formulaire @relation(fields: [formulaireId], references: [id])
+
+  patientId    String
+  patient      Patient    @relation(fields: [patientId], references: [id])
+
+  rendezvousId String?
+
+  reponses     Json
+
+  completeLe   DateTime?
+  lienToken    String     @unique
+  expireA      DateTime
+
+  createdAt DateTime @default(now())
+}
+
+// ─── COMMUNICATIONS ───────────────────────────────────────────────────────────
+
+model Communication {
+  id           String      @id @default(cuid())
+  orgId        String
+
+  patientId    String
+  patient      Patient     @relation(fields: [patientId], references: [id])
+
+  rendezvousId String?
+  rendezvous   RendezVous? @relation(fields: [rendezvousId], references: [id])
+
+  type         TypeCommunication
+  canal        CanalCommunication
+  statut       StatutCommunication @default(EN_ATTENTE)
+
+  sujet        String?
+  contenu      String
+
+  envoyeLe     DateTime?
+  twilioSid    String?
+  resendId     String?
+
+  reponsePatient String?
+  reponseRecueLe DateTime?
+
+  erreur       String?
+
+  resumeIA        String?
+  actionsRequises String?
+  urgence         Boolean  @default(false)
+  tagsIA          String[]
+
+  createdAt DateTime @default(now())
+
+  @@index([patientId])
+  @@index([rendezvousId])
+  @@index([orgId, createdAt])
+}
+
+enum TypeCommunication {
+  RAPPEL_RDV
+  CONFIRMATION_RDV
+  FORMULAIRE_ANAMNE
+  COLLECTE_AVIS
+  RELANCE_TRAITEMENT
+  RAPPEL_HYGIENE
+  CAMPAGNE_MARKETING
+  REPONSE_ENTRANTE
+}
+
+enum CanalCommunication {
+  SMS
+  COURRIEL
+  VOCAL
+}
+
+enum StatutCommunication {
+  EN_ATTENTE
+  ENVOYE
+  DELIVRE
+  LU
+  ECHEC
+  REPONDU
+}
+
+// ─── AVIS GOOGLE ─────────────────────────────────────────────────────────────
+
+model AvisGoogle {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  patientId    String
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  lienEnvoye  Boolean  @default(true)
+  dateEnvoi   DateTime @default(now())
+  aClique     Boolean  @default(false)
+  dateClick   DateTime?
+  noteObtenue Int?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── AUTOMATISATIONS ─────────────────────────────────────────────────────────
+
+model Automatisation {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  nom          String
+  description  String?
+  type         TypeAutomatisation
+  actif        Boolean      @default(true)
+  config       Json
+
+  totalDeclenche           Int       @default(0)
+  totalSucces              Int       @default(0)
+  totalEchec               Int       @default(0)
+  dernierDeclenchement     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TypeAutomatisation {
+  RAPPEL_RDV
+  FORMULAIRE_ANAMNE
+  COLLECTE_AVIS
+  RELANCE_TRAITEMENT
+  RAPPEL_HYGIENE
+  SEQUENCE_ONBOARDING
+}
+
+// ─── CAMPAGNES ────────────────────────────────────────────────────────────────
+
+model Campagne {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  nom          String
+  type         TypeCommunication
+  canal        CanalCommunication
+  filtres      Json
+  contenu      String
+  sujet        String?
+
+  statut       StatutCampagne @default(BROUILLON)
+  planifieLe   DateTime?
+  lanceLe      DateTime?
+  completeLe   DateTime?
+
+  totalCibles  Int @default(0)
+  totalEnvoyes Int @default(0)
+  totalLus     Int @default(0)
+  totalCliques Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum StatutCampagne {
+  BROUILLON
+  PLANIFIE
+  EN_COURS
+  COMPLETE
+  ANNULE
+}
+
+// ─── INTÉGRATIONS ─────────────────────────────────────────────────────────────
+
+model Integration {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  type         TypeIntegration
+  actif        Boolean         @default(false)
+  config       Json
+  derniereSync DateTime?
+  erreur       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, type])
+}
+
+enum TypeIntegration {
+  DENTITEK
+  CLINICMASTER
+  JANE_APP
+  GOOGLE_CALENDAR
+  GOOGLE_MY_BUSINESS
+  OUTLOOK_CALENDAR
+  STRIPE
+  TWILIO
+  RESEND
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id           String @id @default(cuid())
+  orgId        String
+  userId       String
+  entite       String
+  entiteId     String
+  action       String
+  champModifie String?
+  ancienneValeur Json?
+  nouvelleValeur Json?
+  createdAt    DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([entiteId])
+}
+
+// ─── LISTE D'ATTENTE ─────────────────────────────────────────────────────────
+
+model ListeAttente {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  patientId    String
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  praticienId  String?
+  praticien    Praticien?   @relation(fields: [praticienId], references: [id])
+
+  typeRdv      String?
+  dureeMinutes Int          @default(60)
+  notes        String?
+
+  // Disponibilités souhaitées
+  joursDisponibles Json?    // ["LUNDI","MERCREDI","VENDREDI"]
+  heureDebut       String?  // "08:00"
+  heureFin         String?  // "17:00"
+
+  statut         StatutAttente @default(EN_ATTENTE)
+  notifieLe      DateTime?
+  creneauPropose DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, statut])
+  @@index([patientId])
+}
+
+enum StatutAttente {
+  EN_ATTENTE
+  NOTIFIE
+  CONVERTI
+  ANNULE
+}
+
+// ─── FACTURES ────────────────────────────────────────────────────────────────
+
+model Facture {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id])
+
+  patientId    String
+  patient      Patient      @relation(fields: [patientId], references: [id])
+
+  rendezvousId String?      @unique
+  rendezvous   RendezVous?  @relation(fields: [rendezvousId], references: [id])
+
+  numero       String       // e.g. FAC-2026-0001
+
+  lignes       Json         // [{description: string, montant: number}]
+  sousTotal    Decimal      @default(0) @db.Decimal(10, 2)
+  taxes        Decimal      @default(0) @db.Decimal(10, 2)
+  total        Decimal      @default(0) @db.Decimal(10, 2)
+
+  statut       StatutFacture @default(BROUILLON)
+  notes        String?
+
+  destCourriel String?
+  destNom      String?
+
+  envoyeLe     DateTime?
+  payeLe       DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId, statut])
+  @@index([patientId])
+}
+
+enum StatutFacture {
+  BROUILLON
+  ENVOYE
+  PAYE
+  ANNULE
+}
+
+// ─── LOG SUPPRESSION (anonymisé, Loi 25) ─────────────────────────────────────
+
+model LogSuppression {
+  id        String   @id @default(cuid())
+  orgId     String
+  motif     String?
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+}

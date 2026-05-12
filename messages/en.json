@@ -1,0 +1,91 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "patients": "Patients",
+    "rendezVous": "Appointments",
+    "automatisations": "Automations",
+    "formulaires": "Forms",
+    "factures": "Invoices",
+    "avis": "Google Reviews",
+    "rapports": "Reports",
+    "parametres": "Settings"
+  },
+  "dashboard": {
+    "titre": "Dashboard",
+    "noShows": "No-shows",
+    "cetteSemaine": "this week",
+    "rdvConfirmes": "Confirmed appts",
+    "automatiquement": "automatically",
+    "avisGoogle": "Google Reviews",
+    "ceMois": "this month",
+    "revenusRecuperes": "Recovered revenue",
+    "estimes": "estimated",
+    "aujourd'hui": "Today",
+    "actionsRequises": "Action required",
+    "activiteRecente": "Recent activity"
+  },
+  "patients": {
+    "titre": "Patients",
+    "nouveau": "New patient",
+    "recherche": "Search by name, phone or email…",
+    "actif": "Active",
+    "inactif": "Inactive",
+    "exportCSV": "Export CSV",
+    "aucunResultat": "No patients found."
+  },
+  "parametres": {
+    "titre": "Settings",
+    "clinique": "Clinic",
+    "integrations": "Integrations",
+    "facturation": "Billing",
+    "conformite": "Privacy (Law 25)",
+    "equipe": "Team",
+    "sauvegarder": "Save",
+    "sauvegardeReussie": "Settings saved.",
+    "nomClinique": "Clinic name",
+    "typeClinique": "Clinic type",
+    "adresse": "Address",
+    "ville": "City",
+    "codePostal": "Postal code",
+    "telephone": "Phone",
+    "courriel": "Email",
+    "siteWeb": "Website",
+    "praticiens": "Practitioners",
+    "ajouterPraticien": "Add practitioner",
+    "prenom": "First name",
+    "nom": "Last name",
+    "titre": "Title",
+    "specialite": "Specialty"
+  },
+  "types": {
+    "DENTAIRE": "Dental",
+    "PHYSIOTHERAPIE": "Physiotherapy",
+    "PSYCHOLOGIE": "Psychology",
+    "MASSOTHERAPIE": "Massage Therapy",
+    "OPTOMETRIE": "Optometry",
+    "MEDECINE_GENERALE": "General Medicine",
+    "AUTRE": "Other"
+  },
+  "statuts": {
+    "PLANIFIE": "Planned",
+    "CONFIRME": "Confirmed",
+    "ARRIVE": "Arrived",
+    "COMPLETE": "Completed",
+    "NO_SHOW": "No-show",
+    "ANNULE": "Cancelled",
+    "REPLANIFIE": "Rescheduled"
+  },
+  "commun": {
+    "sauvegarder": "Save",
+    "annuler": "Cancel",
+    "supprimer": "Delete",
+    "modifier": "Edit",
+    "ajouter": "Add",
+    "fermer": "Close",
+    "confirmer": "Confirm",
+    "chargement": "Loading…",
+    "erreur": "An error occurred.",
+    "oui": "Yes",
+    "non": "No"
+  }
+}

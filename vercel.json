@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npx prisma generate && next build",
+  "crons": [
+    {
+      "path": "/api/cron/relances",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/hygiene",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
