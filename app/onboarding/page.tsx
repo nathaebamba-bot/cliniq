@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useUser, useOrganizationList } from "@clerk/nextjs"
 import { Building2, ChevronRight, Loader2, Users } from "lucide-react"
+import { trpc } from "@/trpc/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
+import type { TypeClinique } from "@prisma/client"
 
 const TYPES_CLINIQUE = [
   { value: "DENTAIRE", label: "Clinique dentaire" },
@@ -37,6 +39,8 @@ export default function OnboardingPage() {
   const [type, setType] = useState("")
   const [loading, setLoading] = useState(false)
   const [joiningId, setJoiningId] = useState<string | null>(null)
+
+  const upsertOrg = trpc.organisation.upsert.useMutation()
 
   const memberships = userMemberships?.data ?? []
   const hasMemberships = memberships.length > 0
@@ -65,7 +69,12 @@ export default function OnboardingPage() {
     try {
       const org = await createOrganization({ name: nom.trim() })
       await setActive({ organization: org.id })
-      await new Promise((r) => setTimeout(r, 800))
+
+      // Wait for Clerk session to refresh, then persist the clinic type
+      // (the webhook creates the org with type AUTRE as a fallback)
+      await new Promise((r) => setTimeout(r, 1000))
+      await upsertOrg.mutateAsync({ nom: nom.trim(), type: type as TypeClinique }).catch(() => null)
+
       router.push("/dashboard")
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erreur lors de la création."
