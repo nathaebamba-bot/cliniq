@@ -302,12 +302,21 @@ export const formulaireRouter = createTRPCRouter({
       if (!reponse) throw new TRPCError({ code: "NOT_FOUND", message: "Lien invalide" })
       if (new Date() > reponse.expireA) throw new TRPCError({ code: "NOT_FOUND", message: "Lien expiré" })
 
-      // Load the org for branding
       const formulaire = reponse.formulaire
-      const org = await ctx.db.organisation.findUnique({
-        where: { id: formulaire.orgId },
-        select: { nom: true, couleurPrimaire: true, telephone: true },
-      })
+
+      // Load org + RDV date in parallel
+      const [org, rdv] = await Promise.all([
+        ctx.db.organisation.findUnique({
+          where: { id: formulaire.orgId },
+          select: { nom: true, couleurPrimaire: true, telephone: true },
+        }),
+        reponse.rendezvousId
+          ? ctx.db.rendezVous.findUnique({
+              where: { id: reponse.rendezvousId },
+              select: { dateHeure: true, dureeMinutes: true, typeRdv: true },
+            })
+          : null,
+      ])
 
       return {
         reponse: {
@@ -322,6 +331,11 @@ export const formulaireRouter = createTRPCRouter({
         },
         patient: reponse.patient,
         org,
+        rdv: rdv ? {
+          dateHeure: rdv.dateHeure,
+          dureeMinutes: rdv.dureeMinutes,
+          typeRdv: rdv.typeRdv,
+        } : null,
       }
     }),
 

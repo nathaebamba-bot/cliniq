@@ -39,6 +39,20 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
     for (const rdv of rdvs) {
       if (!rdv.patient.consentementSMS) { ignores++; continue }
       try {
+        // Create the AvisGoogle record first to get its ID for the tracking URL
+        const avisRecord = await db.avisGoogle.create({
+          data: {
+            orgId: org.id,
+            patientId: rdv.patient.id,
+            lienEnvoye: true,
+            dateEnvoi: new Date(),
+          },
+        })
+
+        // Use our redirect URL so we can track clicks
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cliniq.app"
+        const lienSuivi = `${appUrl}/api/avis/click/${avisRecord.id}`
+
         const corps = interpolerMessage(
           rdv.patient.langue === "EN"
             ? `Hello {{prenom}}, thank you for your visit! Your review helps us a lot: {{lien}}`
@@ -47,7 +61,7 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
             prenom: rdv.patient.prenom,
             nom: rdv.patient.nom,
             clinique: org.nom,
-            lien: params.avisLienGoogle ?? "",
+            lien: lienSuivi,
           }
         )
         await envoyerEtLogger({
@@ -59,14 +73,6 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
           telephone: rdv.patient.telephone,
         })
         await db.rendezVous.update({ where: { id: rdv.id }, data: { avisEnvoye: true } })
-        await db.avisGoogle.create({
-          data: {
-            orgId: org.id,
-            patientId: rdv.patient.id,
-            lienEnvoye: true,
-            dateEnvoi: new Date(),
-          },
-        })
         envoyes++
       } catch {
         ignores++

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { CheckCircle, AlertCircle, ChevronLeft, ChevronRight, CalendarPlus } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
+import { addMinutes } from "date-fns"
 import { toast } from "sonner"
 import { trpc } from "@/trpc/client"
 import { Button } from "@/components/ui/button"
@@ -116,6 +117,9 @@ export function FormulairePublic({ token }: Props) {
         nom={data.patient.prenom}
         orgNom={data.org?.nom ?? "la clinique"}
         couleur={data.org?.couleurPrimaire ?? "#2563EB"}
+        telephone={data.org?.telephone}
+        rdv={data.rdv ?? null}
+        langue={data.patient.langue}
       />
     )
   }
@@ -351,7 +355,67 @@ function QuestionInput({
 
 // ── Success page ───────────────────────────────────────────────────────────────
 
-function SuccessPage({ nom, orgNom, couleur }: { nom: string; orgNom: string; couleur: string }) {
+function genererICS(params: {
+  titre: string
+  debut: Date
+  fin: Date
+  lieu: string
+  description: string
+}): string {
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Cliniq//FR",
+    "BEGIN:VEVENT",
+    `DTSTART:${fmt(params.debut)}`,
+    `DTEND:${fmt(params.fin)}`,
+    `SUMMARY:${params.titre}`,
+    `DESCRIPTION:${params.description}`,
+    `LOCATION:${params.lieu}`,
+    `UID:${Date.now()}@cliniq.app`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n")
+}
+
+function SuccessPage({
+  nom,
+  orgNom,
+  couleur,
+  telephone,
+  rdv,
+  langue,
+}: {
+  nom: string
+  orgNom: string
+  couleur: string
+  telephone?: string | null
+  rdv: { dateHeure: Date; dureeMinutes: number; typeRdv: string | null } | null
+  langue: string
+}) {
+  const isFR = langue !== "EN"
+
+  function telechargerCalendrier() {
+    if (!rdv) return
+    const debut = new Date(rdv.dateHeure)
+    const fin = addMinutes(debut, rdv.dureeMinutes)
+    const titre = rdv.typeRdv
+      ? `${rdv.typeRdv} — ${orgNom}`
+      : (isFR ? `Rendez-vous — ${orgNom}` : `Appointment — ${orgNom}`)
+    const description = isFR
+      ? `Rendez-vous chez ${orgNom}${telephone ? ` · ${telephone}` : ""}`
+      : `Appointment at ${orgNom}${telephone ? ` · ${telephone}` : ""}`
+    const ics = genererICS({ titre, debut, fin, lieu: orgNom, description })
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "rendez-vous.ics"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <div
@@ -360,15 +424,44 @@ function SuccessPage({ nom, orgNom, couleur }: { nom: string; orgNom: string; co
       >
         <CheckCircle className="h-10 w-10" style={{ color: couleur }} />
       </div>
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Merci, {nom} !</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-2">
+        {isFR ? `Merci, ${nom} !` : `Thank you, ${nom}!`}
+      </h1>
       <p className="text-slate-500 max-w-sm">
-        Votre formulaire a été envoyé à <strong>{orgNom}</strong>. Votre praticien pourra le consulter avant votre rendez-vous.
+        {isFR
+          ? <>Votre formulaire a été envoyé à <strong>{orgNom}</strong>. Votre praticien pourra le consulter avant votre rendez-vous.</>
+          : <>Your form has been sent to <strong>{orgNom}</strong>. Your practitioner will review it before your appointment.</>}
       </p>
-      <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 max-w-sm w-full">
-        <p className="text-sm text-slate-500">
-          Vous pouvez fermer cette page. À bientôt !
-        </p>
-      </div>
+
+      {rdv && (
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 max-w-sm w-full text-left">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+            {isFR ? "Votre rendez-vous" : "Your appointment"}
+          </p>
+          <p className="text-sm font-semibold text-slate-800">
+            {format(new Date(rdv.dateHeure), isFR ? "EEEE d MMMM yyyy" : "EEEE, MMMM d yyyy", { locale: isFR ? fr : undefined })}
+          </p>
+          <p className="text-sm text-slate-500">
+            {format(new Date(rdv.dateHeure), "HH:mm")} · {rdv.dureeMinutes} min · {orgNom}
+          </p>
+          <button
+            onClick={telechargerCalendrier}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            {isFR ? "Ajouter à mon calendrier" : "Add to my calendar"}
+          </button>
+        </div>
+      )}
+
+      {telephone && (
+        <a
+          href={`tel:${telephone}`}
+          className="mt-4 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          {orgNom} · {telephone}
+        </a>
+      )}
     </div>
   )
 }
