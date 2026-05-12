@@ -711,7 +711,7 @@ Reponds en JSON: { "specialiste": "type recommande", "praticienNom": "nom du pra
     // ── laisser_message ──────────────────────────────────────────────────────
     } else if (toolName === "laisser_message") {
       const { nomAppelant, message, urgence } = args as { nomAppelant: string; message: string; urgence?: boolean }
-      const patId = patient?.id ?? (await db.patient.findFirst({ where: { orgId } }))?.id ?? ""
+      const patId = patient?.id ?? (caller ? (await db.patient.findFirst({ where: { orgId, telephone: caller }, select: { id: true } }))?.id : null) ?? null
       if (patId) {
         await db.communication.create({
           data: {

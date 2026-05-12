@@ -164,6 +164,7 @@ export const factureRouter = createTRPCRouter({
         : format(new Date(), "d MMMM yyyy", { locale: fr })
 
       const errors: string[] = []
+      let sent = false
 
       if ((input.canal === "EMAIL" || input.canal === "LES_DEUX") && dest) {
         try {
@@ -200,6 +201,7 @@ export const factureRouter = createTRPCRouter({
             subject: `Facture ${facture.numero} — ${facture.organisation.nom}`,
             html,
           })
+          sent = true
         } catch (e) {
           errors.push(`Courriel: ${String(e)}`)
         }
@@ -212,12 +214,13 @@ export const factureRouter = createTRPCRouter({
             destTel,
             `Bonjour ${facture.patient.prenom}, votre facture ${facture.numero} de ${Number(facture.total).toFixed(2)}$ chez ${facture.organisation.nom} est disponible. Pour payer ou obtenir une copie: ${facture.organisation.telephone ?? "contactez-nous"}.`
           )
+          sent = true
         } catch (e) {
           errors.push(`SMS: ${String(e)}`)
         }
       }
 
-      if (errors.length === 0) {
+      if (sent) {
         await ctx.db.facture.update({
           where: { id: input.id },
           data: { statut: "ENVOYE", envoyeLe: new Date() },

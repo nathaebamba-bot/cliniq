@@ -49,6 +49,9 @@ export const conformiteRouter = createTRPCRouter({
         ctx.db.communication.deleteMany({ where: { patientId: patient.id } }),
         ctx.db.avisGoogle.deleteMany({ where: { patientId: patient.id } }),
         ctx.db.formulaireReponse.deleteMany({ where: { patientId: patient.id } }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (ctx.db as any).listeAttente.deleteMany({ where: { patientId: patient.id } }),
+        ctx.db.facture.deleteMany({ where: { patientId: patient.id } }),
         ctx.db.rendezVous.deleteMany({ where: { patientId: patient.id } }),
         ctx.db.patient.delete({ where: { id: patient.id } }),
         ctx.db.logSuppression.create({ data: { orgId, motif: "Demande patient — droit à l'effacement" } }),
