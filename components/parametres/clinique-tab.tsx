@@ -30,6 +30,10 @@ const orgSchema = z.object({
   couleurPrimaire: z.string().optional(),
 })
 
+const parametresBaseSchema = z.object({
+  tarifMoyenConsultation: z.number().int().min(0).max(9999),
+})
+
 const praticienSchema = z.object({
   prenom: z.string().min(1, "Prénom requis"),
   nom: z.string().min(1, "Nom requis"),
@@ -41,6 +45,7 @@ const praticienSchema = z.object({
 })
 
 type OrgForm = z.infer<typeof orgSchema>
+type ParametresBaseForm = z.infer<typeof parametresBaseSchema>
 type PraticienForm = z.infer<typeof praticienSchema>
 
 const TYPE_LABELS: Record<TypeClinique, string> = {
@@ -60,6 +65,14 @@ export function CliniquTab() {
   const upsert = trpc.organisation.upsert.useMutation({
     onSuccess: () => { toast.success(t("sauvegardeReussie")); utils.organisation.get.invalidate() },
     onError: (e) => toast.error(e.message),
+  })
+  const updateParametres = trpc.organisation.updateParametres.useMutation({
+    onSuccess: () => { toast.success(t("sauvegardeReussie")); utils.organisation.get.invalidate() },
+    onError: (e) => toast.error(e.message),
+  })
+  const parametresForm = useForm<ParametresBaseForm>({
+    resolver: zodResolver(parametresBaseSchema),
+    values: { tarifMoyenConsultation: org?.parametres?.tarifMoyenConsultation ?? 150 },
   })
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<OrgForm>({
@@ -190,6 +203,40 @@ export function CliniquTab() {
                 {upsert.isPending ? "Sauvegarde…" : t("sauvegarder")}
               </Button>
             </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Tarif moyen */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-base">Revenus récupérés — tarif de référence</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={parametresForm.handleSubmit((d) => updateParametres.mutate(d))}
+            className="flex items-end gap-4"
+          >
+            <div className="space-y-1.5 flex-1 max-w-xs">
+              <Label htmlFor="tarif">Tarif moyen par consultation (CAD $)</Label>
+              <p className="text-xs text-text-tertiary">
+                Utilisé pour estimer les revenus récupérés sur le dashboard (no-shows évités × tarif).
+              </p>
+              <Input
+                id="tarif"
+                type="number"
+                min={0}
+                max={9999}
+                step={1}
+                {...parametresForm.register("tarifMoyenConsultation", { valueAsNumber: true })}
+              />
+              {parametresForm.formState.errors.tarifMoyenConsultation && (
+                <p className="text-xs text-brand-danger">{parametresForm.formState.errors.tarifMoyenConsultation.message}</p>
+              )}
+            </div>
+            <Button type="submit" disabled={updateParametres.isPending}>
+              {updateParametres.isPending ? "Sauvegarde…" : t("sauvegarder")}
+            </Button>
           </form>
         </CardContent>
       </Card>

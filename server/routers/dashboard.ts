@@ -45,12 +45,15 @@ export const dashboardRouter = createTRPCRouter({
       ctx.db.avisGoogle.count({
         where: { orgId, dateEnvoi: { gte: debutMois } },
       }),
-      // Fallback tarif moyen 150 CAD if not configured
-      Promise.resolve(150),
+      ctx.db.parametresClinique.findUnique({
+        where: { orgId },
+        select: { tarifMoyenConsultation: true },
+      }),
     ])
 
     // No-shows évités = (taux de no-show avant rappels - taux actuel) * total RDV
     // We approximate: no-shows évités = confirmed appointments (they would have been no-shows without reminders)
+    const tarif = tarifMoyen?.tarifMoyenConsultation ?? 150
     const noShowsEvites = Math.max(0, noShowsSemPrecedente - noShowsSemaine)
     const tauxConfirmation = rdvTotalSemaine > 0
       ? Math.round((rdvConfirmesSemaine / rdvTotalSemaine) * 100)
@@ -64,7 +67,8 @@ export const dashboardRouter = createTRPCRouter({
       tauxConfirmation,
       avisGoogle,
       noShowsEvites,
-      revenusRecuperes: noShowsEvites * tarifMoyen,
+      tarifMoyenConsultation: tarif,
+      revenusRecuperes: noShowsEvites * tarif,
     }
   }),
 

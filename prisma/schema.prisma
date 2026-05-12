@@ -94,6 +94,8 @@ model ParametresClinique {
   hygieneActif         Boolean @default(false)
   hygieneDelaiMois     Int     @default(6)
 
+  tarifMoyenConsultation Int  @default(150)
+
   heureDebutEnvoi      String  @default("08:00")
   heureFinEnvoi        String  @default("20:00")
   fuseauHoraire        String  @default("America/Toronto")

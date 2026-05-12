@@ -47,6 +47,7 @@ export const organisationRouter = createTRPCRouter({
         avisMessageSMS: z.string().optional(),
         relanceActif: z.boolean().optional(),
         relanceDelaiJours: z.number().int().min(1).optional(),
+        tarifMoyenConsultation: z.number().int().min(0).max(9999).optional(),
         heureDebutEnvoi: z.string().optional(),
         heureFinEnvoi: z.string().optional(),
         fuseauHoraire: z.string().optional(),
