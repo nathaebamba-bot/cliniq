@@ -38,9 +38,12 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
 
     for (const rdv of rdvs) {
       if (!rdv.patient.consentementSMS) { ignores++; continue }
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cliniq.app"
+      let avisRecord: { id: string } | null = null
+
       try {
-        // Create the AvisGoogle record first to get its ID for the tracking URL
-        const avisRecord = await db.avisGoogle.create({
+        avisRecord = await db.avisGoogle.create({
           data: {
             orgId: org.id,
             patientId: rdv.patient.id,
@@ -49,10 +52,7 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
           },
         })
 
-        // Use our redirect URL so we can track clicks
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cliniq.app"
         const lienSuivi = `${appUrl}/api/avis/click/${avisRecord.id}`
-
         const corps = interpolerMessage(
           rdv.patient.langue === "EN"
             ? `Hello {{prenom}}, thank you for your visit! Your review helps us a lot: {{lien}}`
@@ -64,6 +64,7 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
             lien: lienSuivi,
           }
         )
+
         await envoyerEtLogger({
           orgId: org.id,
           patientId: rdv.patient.id,
@@ -72,9 +73,15 @@ export async function executerCollecteAvis(): Promise<{ envoyes: number; ignores
           corps,
           telephone: rdv.patient.telephone,
         })
+
         await db.rendezVous.update({ where: { id: rdv.id }, data: { avisEnvoye: true } })
         envoyes++
-      } catch {
+      } catch (err) {
+        // Roll back the AvisGoogle record so the next run retries cleanly
+        if (avisRecord) {
+          await db.avisGoogle.delete({ where: { id: avisRecord.id } }).catch(() => null)
+        }
+        console.error(`collecte-avis: échec pour RDV ${rdv.id} (patient ${rdv.patient.id}):`, err)
         ignores++
       }
     }

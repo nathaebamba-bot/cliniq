@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { toast } from "sonner"
-import { ExternalLink, Clock, User, Pencil, Trash2, X, Check, Send, FileText, Loader2 } from "lucide-react"
+import { ExternalLink, Clock, User, Pencil, Trash2, X, Check, Send, FileText, Loader2, Star } from "lucide-react"
 import { trpc } from "@/trpc/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,7 @@ interface RdvItem {
   typeRdv: string | null
   notes: string | null
   statut: StatutRdv
+  avisEnvoye: boolean
   patient: { id: string; prenom: string; nom: string; telephone: string }
   praticien: { id: string; prenom: string; nom: string; couleur: string | null }
 }
@@ -110,6 +111,14 @@ export function RdvDrawer({ rdv, open, onOpenChange }: Props) {
       if (res.ok) toast.success("Facture envoyée au patient.")
       else toast.error(`Erreur envoi: ${res.errors.join(", ")}`)
       setShowFactureDialog(false)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const envoyerAvisMutation = trpc.avis.envoyerAvisManuel.useMutation({
+    onSuccess: () => {
+      utils.rendezVous.liste.invalidate()
+      toast.success("Lien d'avis Google envoyé par SMS.")
     },
     onError: (e) => toast.error(e.message),
   })
@@ -314,30 +323,56 @@ export function RdvDrawer({ rdv, open, onOpenChange }: Props) {
                 )}
 
                 {rdv.statut === "COMPLETE" && (
-                  <div className="pt-2 border-t border-border">
-                    <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">Facturation</p>
-                    {rdvFacture ? (
-                      <div className="flex items-center justify-between bg-bg-secondary rounded-lg px-3 py-2">
-                        <div>
-                          <p className="text-xs font-mono text-text-secondary">{rdvFacture.numero}</p>
-                          <p className="text-sm font-semibold">{Number(rdvFacture.total).toFixed(2)} $</p>
+                  <div className="pt-2 border-t border-border space-y-4">
+                    {/* Facturation */}
+                    <div>
+                      <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">Facturation</p>
+                      {rdvFacture ? (
+                        <div className="flex items-center justify-between bg-bg-secondary rounded-lg px-3 py-2">
+                          <div>
+                            <p className="text-xs font-mono text-text-secondary">{rdvFacture.numero}</p>
+                            <p className="text-sm font-semibold">{Number(rdvFacture.total).toFixed(2)} $</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5"
+                            onClick={() => setShowFactureDialog(true)}
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Envoyer
+                          </Button>
                         </div>
+                      ) : (
+                        <p className="text-xs text-text-tertiary flex items-center gap-1">
+                          <FileText className="h-3.5 w-3.5" />
+                          Aucune facture — marquez le RDV comme Complété pour en créer une.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Avis Google */}
+                    <div>
+                      <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">Avis Google</p>
+                      <div className="flex items-center justify-between bg-bg-secondary rounded-lg px-3 py-2">
+                        <p className="text-xs text-text-secondary flex items-center gap-1.5">
+                          <Star className={`h-3.5 w-3.5 ${rdv.avisEnvoye ? "text-amber-500" : "text-text-tertiary"}`} />
+                          {rdv.avisEnvoye ? "Lien envoyé" : "Pas encore envoyé"}
+                        </p>
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-8 gap-1.5"
-                          onClick={() => setShowFactureDialog(true)}
+                          disabled={envoyerAvisMutation.isPending}
+                          onClick={() => envoyerAvisMutation.mutate({ patientId: rdv.patient.id, rendezvousId: rdv.id })}
                         >
-                          <Send className="h-3.5 w-3.5" />
-                          Envoyer
+                          {envoyerAvisMutation.isPending
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Star className="h-3.5 w-3.5" />}
+                          {rdv.avisEnvoye ? "Renvoyer" : "Envoyer"}
                         </Button>
                       </div>
-                    ) : (
-                      <p className="text-xs text-text-tertiary flex items-center gap-1">
-                        <FileText className="h-3.5 w-3.5" />
-                        Aucune facture — marquez le RDV comme Complété pour en créer une.
-                      </p>
-                    )}
+                    </div>
                   </div>
                 )}
               </>

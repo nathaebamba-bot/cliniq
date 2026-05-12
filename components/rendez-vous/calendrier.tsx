@@ -25,6 +25,7 @@ interface RdvItem {
   typeRdv: string | null
   notes: string | null
   statut: StatutRdv
+  avisEnvoye: boolean
   patient: { id: string; prenom: string; nom: string; telephone: string }
   praticien: { id: string; prenom: string; nom: string; couleur: string | null }
 }

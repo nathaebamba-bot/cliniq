@@ -33,7 +33,15 @@ export const rendezVousRouter = createTRPCRouter({
           ...(input.praticienId ? { praticienId: input.praticienId } : {}),
           ...(input.statut ? { statut: input.statut } : {}),
         },
-        include: {
+        select: {
+          id: true,
+          dateHeure: true,
+          dureeMinutes: true,
+          typeRdv: true,
+          notes: true,
+          statut: true,
+          avisEnvoye: true,
+          confirmeParPatient: true,
           patient: { select: { id: true, prenom: true, nom: true, telephone: true } },
           praticien: { select: { id: true, prenom: true, nom: true, couleur: true } },
         },

@@ -61,7 +61,7 @@ export function PatientDetail({ patientId }: Props) {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [selectedRdv, setSelectedRdv] = useState<{
     id: string; dateHeure: Date; dureeMinutes: number; typeRdv: string | null
-    notes: string | null; statut: StatutRdv
+    notes: string | null; statut: StatutRdv; avisEnvoye: boolean
     patient: { id: string; prenom: string; nom: string; telephone: string }
     praticien: { id: string; prenom: string; nom: string; couleur: string | null }
   } | null>(null)

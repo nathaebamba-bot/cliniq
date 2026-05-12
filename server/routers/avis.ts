@@ -108,59 +108,66 @@ export const avisRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const orgId = await getOrgId(ctx)
 
-      const [patient, params] = await Promise.all([
+      const [patient, params, org] = await Promise.all([
         ctx.db.patient.findFirst({ where: { id: input.patientId, orgId } }),
         ctx.db.parametresClinique.findUnique({ where: { orgId } }),
+        ctx.db.organisation.findUnique({ where: { id: orgId }, select: { nom: true } }),
       ])
       if (!patient) throw new TRPCError({ code: "NOT_FOUND", message: "Patient introuvable" })
       if (!params?.avisLienGoogle) throw new TRPCError({ code: "BAD_REQUEST", message: "Lien Google My Business non configuré dans les paramètres" })
-
-      const lien = params.avisLienGoogle
-      const template = params.avisMessageSMS ?? "Bonjour {{prenom}}, merci pour votre visite! Votre avis nous aide beaucoup: {{lien}}"
-      const msg = template.replace("{{prenom}}", patient.prenom).replace("{{lien}}", lien)
-
-      await ctx.db.avisGoogle.create({
-        data: {
-          orgId,
-          patientId: input.patientId,
-          lienEnvoye: true,
-          dateEnvoi: new Date(),
-        },
-      })
-
-      let smsSent = false
-      let smsError: string | undefined
-
-      if (patient.consentementSMS && patient.telephone) {
-        try {
-          const { envoyerSMS } = await import("@/lib/twilio")
-          const sid = await envoyerSMS(patient.telephone, msg)
-          await ctx.db.communication.create({
-            data: {
-              orgId,
-              patientId: input.patientId,
-              rendezvousId: input.rendezvousId ?? null,
-              type: "COLLECTE_AVIS",
-              canal: "SMS",
-              statut: "ENVOYE",
-              contenu: msg,
-              twilioSid: sid,
-              envoyeLe: new Date(),
-            },
-          })
-          if (input.rendezvousId) {
-            await ctx.db.rendezVous.update({
-              where: { id: input.rendezvousId },
-              data: { avisEnvoye: true },
-            })
-          }
-          smsSent = true
-        } catch (err) {
-          smsError = err instanceof Error ? err.message : "Erreur Twilio inconnue"
-        }
+      if (!patient.consentementSMS || !patient.telephone) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le patient n'a pas de consentement SMS ou de numéro de téléphone." })
       }
 
-      return { smsSent, smsError, lien }
+      // Create tracking record first, roll back on failure
+      const avisRecord = await ctx.db.avisGoogle.create({
+        data: { orgId, patientId: input.patientId, lienEnvoye: true, dateEnvoi: new Date() },
+      })
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cliniq.app"
+      const lienSuivi = `${appUrl}/api/avis/click/${avisRecord.id}`
+
+      const template = patient.langue === "EN"
+        ? `Hello {{prenom}}, thank you for your visit! Your review helps us a lot: {{lien}}`
+        : (params.avisMessageSMS ?? "Bonjour {{prenom}}, merci pour votre visite! Votre avis nous aide beaucoup: {{lien}}")
+
+      const { interpolerMessage } = await import("@/lib/utils")
+      const msg = interpolerMessage(template, {
+        prenom: patient.prenom,
+        nom: patient.nom,
+        clinique: org?.nom ?? "",
+        lien: lienSuivi,
+      })
+
+      try {
+        const { envoyerSMS } = await import("@/lib/twilio")
+        const sid = await envoyerSMS(patient.telephone, msg)
+        await ctx.db.communication.create({
+          data: {
+            orgId,
+            patientId: input.patientId,
+            rendezvousId: input.rendezvousId ?? null,
+            type: "COLLECTE_AVIS",
+            canal: "SMS",
+            statut: "ENVOYE",
+            contenu: msg,
+            twilioSid: sid,
+            envoyeLe: new Date(),
+          },
+        })
+        if (input.rendezvousId) {
+          await ctx.db.rendezVous.update({
+            where: { id: input.rendezvousId },
+            data: { avisEnvoye: true },
+          }).catch(() => null)
+        }
+        return { smsSent: true, lienSuivi }
+      } catch (err) {
+        // Roll back the AvisGoogle record so we don't skew click stats
+        await ctx.db.avisGoogle.delete({ where: { id: avisRecord.id } }).catch(() => null)
+        const message = err instanceof Error ? err.message : "Erreur Twilio inconnue"
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Échec Twilio: ${message}` })
+      }
     }),
 
   parJour: protectedProcedure.query(async ({ ctx }) => {
