@@ -150,6 +150,12 @@ async function handleParler(req: Request) {
     select: { id: true, prenom: true, nom: true, specialite: true },
   }) : []
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const servicesCatalogue: any[] = orgId ? await (db as any).catalogueService.findMany({
+    where: { orgId, actif: true },
+    orderBy: [{ typeRdv: "asc" }, { nom: "asc" }],
+  }) : []
+
   const tz = org?.parametres?.fuseauHoraire ?? "America/Toronto"
   const heureDebut = parseInt((org?.parametres?.heureDebutEnvoi ?? "08:00").split(":")[0])
   const heureFin = parseInt((org?.parametres?.heureFinEnvoi ?? "18:00").split(":")[0])
@@ -283,6 +289,19 @@ async function handleParler(req: Request) {
     {
       type: "function",
       function: {
+        name: "get_tarifs",
+        description: "Retourne les prix des services de la clinique. Appeler quand le patient demande le cout d'un traitement ou service.",
+        parameters: {
+          type: "object",
+          properties: {
+            typeService: { type: "string", description: "Type de service ou traitement recherche (ex: nettoyage, massage, consultation). Laisser vide pour tous les tarifs." },
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
         name: "transferer_humain",
         description: "Transfere l'appel. Pour: urgence medicale, resultats analyses, ordonnances, plaintes, demande explicite.",
         parameters: { type: "object", properties: {} },
@@ -322,6 +341,7 @@ FLUX PRISE DE RDV (dans l'ordre):
    - Je ne sais pas → appeler enregistrer_assurance avec statut INCONNU
 7. Appeler reserver_rdv
 8. Dire: "Parfait! Votre RDV est confirme. Vous recevrez un SMS de confirmation et un formulaire de sante a remplir avant votre visite."
+   - Si le patient demande le prix du service: appeler get_tarifs et mentionner le montant avant de confirmer le RDV
 
 INSTRUCTION CRITIQUE pour reserver_rdv:
 - Utiliser le localIso EXACTEMENT tel que fourni par get_creneaux_disponibles
@@ -344,7 +364,8 @@ TOUS LES CAS D'APPEL:
 - INFOS (horaires/adresse) → repondre directement
 - RESULTATS/ORDONNANCES → transferer_humain
 - PARLER A QUELQU'UN → transferer_humain
-- TARIFS/ASSURANCES → donner numero: ${org?.telephone ?? "appelez-nous"}, preciser que les codes de facturation seront sur la facture
+- TARIFS/PRIX D'UN SERVICE → appeler get_tarifs et lire le prix clairement. Mentionner que la facture avec codes assurance sera envoyee apres le RDV.
+- TARIFS NON CONFIGURES → dire "Pour les tarifs exacts, appelez-nous au ${org?.telephone ?? "notre numero"}"
 - PLAINTE → transferer_humain
 - MESSAGE EQUIPE → laisser_message`
 
@@ -706,6 +727,30 @@ Reponds en JSON: { "specialiste": "type recommande", "praticienNom": "nom du pra
         } else {
           toolResult = "Aucun RDV a annuler."
         }
+      }
+
+    // ── get_tarifs ───────────────────────────────────────────────────────────
+    } else if (toolName === "get_tarifs") {
+      if (servicesCatalogue.length === 0) {
+        toolResult = `Aucun tarif configure dans le systeme. Rediriger vers: ${org?.telephone ?? "le numero de la clinique"}.`
+      } else {
+        const typeFilter = ((args.typeService as string | undefined) ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const matches = typeFilter
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? servicesCatalogue.filter((s: any) => {
+              const nom = (s.nom as string).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+              const type = ((s.typeRdv as string | null) ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+              const desc = ((s.description as string | null) ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+              return nom.includes(typeFilter) || type.includes(typeFilter) || desc.includes(typeFilter)
+            })
+          : servicesCatalogue
+
+        const liste = (matches.length > 0 ? matches : servicesCatalogue).slice(0, 8)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        toolResult = `Tarifs disponibles: ` + liste.map((s: any) =>
+          `${s.nom} — ${Number(s.prix).toFixed(2)}$${s.codeFacturation ? ` (code assurance: ${s.codeFacturation})` : ""}`
+        ).join(". ") + `. La facture avec les codes de facturation sera envoyee apres le RDV.`
       }
 
     // ── laisser_message ──────────────────────────────────────────────────────
