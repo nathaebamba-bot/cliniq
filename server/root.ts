@@ -13,6 +13,7 @@ import { conformiteRouter } from "@/server/routers/conformite"
 import { searchRouter } from "@/server/routers/search"
 import { listeAttenteRouter } from "@/server/routers/liste-attente"
 import { factureRouter } from "@/server/routers/facture"
+import { catalogueServiceRouter } from "@/server/routers/catalogue-service"
 
 export const appRouter = createTRPCRouter({
   organisation: organisationRouter,
@@ -29,6 +30,7 @@ export const appRouter = createTRPCRouter({
   search: searchRouter,
   listeAttente: listeAttenteRouter,
   facture: factureRouter,
+  catalogueService: catalogueServiceRouter,
 })
 
 export type AppRouter = typeof appRouter

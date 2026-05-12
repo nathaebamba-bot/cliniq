@@ -38,8 +38,9 @@ model Organisation {
   automatisations Automatisation[]
   campagnes       Campagne[]
   avisGoogle      AvisGoogle[]
-  listeAttente    ListeAttente[]
-  factures        Facture[]
+  listeAttente      ListeAttente[]
+  factures          Facture[]
+  catalogueServices CatalogueService[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -566,6 +567,26 @@ enum StatutFacture {
   ENVOYE
   PAYE
   ANNULE
+}
+
+// ─── CATALOGUE DE SERVICES ───────────────────────────────────────────────────
+
+model CatalogueService {
+  id              String       @id @default(cuid())
+  orgId           String
+  organisation    Organisation @relation(fields: [orgId], references: [id])
+
+  nom             String
+  description     String?
+  prix            Decimal      @db.Decimal(10, 2)
+  codeFacturation String?      // Insurance billing code (e.g. 11110, E120)
+  typeRdv         String?      // Optional link to appointment type name
+  actif           Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
 }
 
 // ─── LOG SUPPRESSION (anonymisé, Loi 25) ─────────────────────────────────────

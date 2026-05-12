@@ -195,12 +195,13 @@ export const factureRouter = createTRPCRouter({
     <p style="font-size:13px;color:#94a3b8">Pour toute question: ${facture.organisation.telephone ?? ""} · ${facture.organisation.courriel ?? ""}</p>
   </div>
 </div>`
-          await resend.emails.send({
+          const { data: emailData, error: emailError } = await resend.emails.send({
             from: `${FROM.name} <${FROM.email}>`,
             to: dest,
             subject: `Facture ${facture.numero} — ${facture.organisation.nom}`,
             html,
           })
+          if (emailError || !emailData) throw new Error(emailError?.message ?? "Erreur Resend inconnue")
           sent = true
         } catch (e) {
           errors.push(`Courriel: ${String(e)}`)
@@ -220,6 +221,10 @@ export const factureRouter = createTRPCRouter({
         }
       }
 
+      if (!sent && errors.length === 0) {
+        errors.push("Aucun canal disponible — vérifiez l'adresse courriel du patient et le consentement SMS.")
+      }
+
       if (sent) {
         await ctx.db.facture.update({
           where: { id: input.id },
@@ -227,7 +232,7 @@ export const factureRouter = createTRPCRouter({
         })
       }
 
-      return { ok: errors.length === 0, errors }
+      return { ok: sent, errors }
     }),
 
   marquerPaye: protectedProcedure

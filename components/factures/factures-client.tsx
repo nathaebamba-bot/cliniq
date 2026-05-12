@@ -4,7 +4,7 @@ import { useState } from "react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { toast } from "sonner"
-import { Send, CheckCircle, FileText, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Send, CheckCircle, FileText, Loader2, MoreHorizontal, Pencil, Trash2, BookOpen } from "lucide-react"
 import { trpc } from "@/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -60,6 +60,8 @@ export function FacturesClient() {
   const [editTaxes, setEditTaxes] = useState(0)
   const [editCourriel, setEditCourriel] = useState("")
   const [sendCanal, setSendCanal] = useState<"EMAIL" | "SMS" | "LES_DEUX">("EMAIL")
+
+  const { data: catalogue } = trpc.catalogueService.liste.useQuery({ actifSeulement: true })
 
   const { data, isLoading } = trpc.facture.liste.useQuery({
     page,
@@ -278,12 +280,32 @@ export function FacturesClient() {
                     >×</Button>
                   </div>
                 ))}
-                <Button
-                  variant="outline" size="sm"
-                  onClick={() => setEditLignes([...editLignes, { description: "", montant: 0 }])}
-                >
-                  + Ajouter une ligne
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={() => setEditLignes([...editLignes, { description: "", montant: 0 }])}
+                  >
+                    + Ligne manuelle
+                  </Button>
+                  {catalogue && catalogue.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex items-center gap-1 rounded-md border border-border px-3 h-8 text-sm hover:bg-bg-secondary transition-colors">
+                        <BookOpen className="h-3.5 w-3.5" /> Du catalogue
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto w-72">
+                        {catalogue.map((s: { id: string; nom: string; prix: unknown }) => (
+                          <DropdownMenuItem
+                            key={s.id}
+                            onClick={() => setEditLignes([...editLignes, { description: s.nom, montant: Number(s.prix) }])}
+                          >
+                            <span className="flex-1">{s.nom}</span>
+                            <span className="ml-2 text-text-tertiary tabular-nums">{Number(s.prix).toFixed(2)} $</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex gap-3">

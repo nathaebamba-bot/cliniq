@@ -8,6 +8,7 @@ import { FacturationTab } from "@/components/parametres/facturation-tab"
 import { IntegrationsTab } from "@/components/parametres/integrations-tab"
 import { ConformiteTab } from "@/components/parametres/conformite-tab"
 import { EquipeTab } from "@/components/parametres/equipe-tab"
+import { ServicesTab } from "@/components/parametres/services-tab"
 
 export default function ParametresPage() {
   const searchParams = useSearchParams()
@@ -23,6 +24,7 @@ export default function ParametresPage() {
           <TabsTrigger value="integrations">Intégrations</TabsTrigger>
           <TabsTrigger value="facturation">Facturation</TabsTrigger>
           <TabsTrigger value="conformite">Conformité Loi 25</TabsTrigger>
+          <TabsTrigger value="services">Services & Tarifs</TabsTrigger>
           <TabsTrigger value="equipe">Équipe</TabsTrigger>
         </TabsList>
 
@@ -37,6 +39,9 @@ export default function ParametresPage() {
         </TabsContent>
         <TabsContent value="conformite">
           <ConformiteTab />
+        </TabsContent>
+        <TabsContent value="services">
+          <ServicesTab />
         </TabsContent>
         <TabsContent value="equipe">
           <EquipeTab />

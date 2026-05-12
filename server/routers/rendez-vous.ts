@@ -154,16 +154,34 @@ export const rendezVousRouter = createTRPCRouter({
             const year = new Date().getFullYear()
             const numero = `FAC-${year}-${String(count + 1).padStart(4, "0")}`
             const typeService = existing.typeRdv ?? "Consultation"
+
+            // Pre-fill lines from service catalogue if matching type exists
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const servicesCatalogue: any[] = existing.typeRdv
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ? await (ctx.db as any).catalogueService.findMany({
+                  where: { orgId, typeRdv: existing.typeRdv, actif: true },
+                  orderBy: { nom: "asc" },
+                })
+              : []
+
+            const lignes: { description: string; montant: number }[] = servicesCatalogue.length > 0
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ? servicesCatalogue.map((s: any) => ({ description: s.nom as string, montant: Number(s.prix) }))
+              : [{ description: typeService, montant: 0 }]
+
+            const sousTotal = lignes.reduce((acc, l) => acc + l.montant, 0)
+
             await ctx.db.facture.create({
               data: {
                 orgId,
                 patientId: existing.patientId,
                 rendezvousId: input.id,
                 numero,
-                lignes: [{ description: typeService, montant: 0 }],
-                sousTotal: 0,
+                lignes,
+                sousTotal,
                 taxes: 0,
-                total: 0,
+                total: sousTotal,
                 statut: "BROUILLON",
                 destCourriel: existing.patient.courriel,
                 destNom: `${existing.patient.prenom} ${existing.patient.nom}`,
