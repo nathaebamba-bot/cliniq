@@ -74,9 +74,25 @@ export function ImportCSVDialog({ open, onOpenChange, onSuccess }: Props) {
   }
 
   function handleFile(file: File) {
+    // Map French export headers → camelCase keys the normaliser expects
+    const HEADER_MAP: Record<string, string> = {
+      "Prenom": "prenom",
+      "Nom": "nom",
+      "Date naissance": "dateNaissance",
+      "Sexe": "sexe",
+      "Telephone": "telephone",
+      "Courriel": "courriel",
+      "Langue": "langue",
+      "Consentement SMS": "consentementSMS",
+      "Consentement courriel": "consentementCourriel",
+      "Notes": "notes",
+      "Cree le": "creeLe",
+    }
+
     Papa.parse<Row>(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (h) => HEADER_MAP[h.trim()] ?? h.trim().toLowerCase().replace(/\s+/g, ""),
       complete: (result) => {
         const normalises = result.data.map(normaliser)
         const valides = normalises.filter(estValide)
