@@ -25,19 +25,17 @@ export const dashboardRouter = createTRPCRouter({
     const [
       noShowsSemaine,
       noShowsSemPrecedente,
-      rdvConfirmesSemaine,
       rdvTotalSemaine,
       avisGoogle,
-      tarifMoyen,
+      parametres,
+      // RDVs confirmed by patient this week (saved by reminders) with their invoice + typeRdv
+      rdvsSauves,
     ] = await Promise.all([
       ctx.db.rendezVous.count({
         where: { orgId, statut: "NO_SHOW", dateHeure: { gte: debutSemaine, lte: finSemaine } },
       }),
       ctx.db.rendezVous.count({
         where: { orgId, statut: "NO_SHOW", dateHeure: { gte: semainePrecedenteDebut, lte: semainePrecedenteFin } },
-      }),
-      ctx.db.rendezVous.count({
-        where: { orgId, confirmeParPatient: true, dateHeure: { gte: debutSemaine, lte: finSemaine } },
       }),
       ctx.db.rendezVous.count({
         where: { orgId, dateHeure: { gte: debutSemaine, lte: finSemaine } },
@@ -49,11 +47,56 @@ export const dashboardRouter = createTRPCRouter({
         where: { orgId },
         select: { tarifMoyenConsultation: true },
       }),
+      ctx.db.rendezVous.findMany({
+        where: {
+          orgId,
+          confirmeParPatient: true,
+          statut: { notIn: ["NO_SHOW", "ANNULE"] },
+          dateHeure: { gte: debutSemaine, lte: finSemaine },
+        },
+        select: {
+          typeRdv: true,
+          facture: { select: { total: true, statut: true } },
+        },
+      }),
     ])
 
-    // No-shows évités = (taux de no-show avant rappels - taux actuel) * total RDV
-    // We approximate: no-shows évités = confirmed appointments (they would have been no-shows without reminders)
-    const tarif = tarifMoyen?.tarifMoyenConsultation ?? 150
+    // Load catalogue for typeRdv fallback (only types present in saved RDVs)
+    const typesPresents = [...new Set(rdvsSauves.map((r) => r.typeRdv).filter(Boolean))] as string[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const catalogue: { typeRdv: string | null; prix: number }[] = typesPresents.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? await (ctx.db as any).catalogueService.findMany({
+          where: { orgId, actif: true, typeRdv: { in: typesPresents } },
+          select: { typeRdv: true, prix: true },
+        })
+      : []
+
+    const tarifFallback = parametres?.tarifMoyenConsultation ?? 150
+
+    // Build a map typeRdv → sum of catalogue prices
+    const tarifParType = new Map<string, number>()
+    for (const s of catalogue) {
+      if (!s.typeRdv) continue
+      tarifParType.set(s.typeRdv, (tarifParType.get(s.typeRdv) ?? 0) + Number(s.prix))
+    }
+
+    // Calculate recovered revenue per saved RDV
+    let revenusRecuperes = 0
+    for (const rdv of rdvsSauves) {
+      if (rdv.facture && rdv.facture.statut !== "ANNULE") {
+        // Use actual invoice total
+        revenusRecuperes += Number(rdv.facture.total)
+      } else if (rdv.typeRdv && tarifParType.has(rdv.typeRdv)) {
+        // Use catalogue sum for this appointment type
+        revenusRecuperes += tarifParType.get(rdv.typeRdv)!
+      } else {
+        // Fallback to configured average rate
+        revenusRecuperes += tarifFallback
+      }
+    }
+
+    const rdvConfirmesSemaine = rdvsSauves.length
     const noShowsEvites = Math.max(0, noShowsSemPrecedente - noShowsSemaine)
     const tauxConfirmation = rdvTotalSemaine > 0
       ? Math.round((rdvConfirmesSemaine / rdvTotalSemaine) * 100)
@@ -67,8 +110,8 @@ export const dashboardRouter = createTRPCRouter({
       tauxConfirmation,
       avisGoogle,
       noShowsEvites,
-      tarifMoyenConsultation: tarif,
-      revenusRecuperes: noShowsEvites * tarif,
+      tarifMoyenConsultation: tarifFallback,
+      revenusRecuperes: Math.round(revenusRecuperes),
     }
   }),
 
