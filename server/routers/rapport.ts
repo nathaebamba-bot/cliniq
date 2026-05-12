@@ -33,6 +33,7 @@ export const rapportRouter = createTRPCRouter({
         formulairesComplete,
         relancesEnvoyees,
         avisEnvoyes,
+        parametres,
       ] = await Promise.all([
         ctx.db.rendezVous.count({ where: { orgId, dateHeure: { gte: debut, lte: fin } } }),
         ctx.db.rendezVous.count({ where: { orgId, statut: "NO_SHOW", dateHeure: { gte: debut, lte: fin } } }),
@@ -40,8 +41,10 @@ export const rapportRouter = createTRPCRouter({
         ctx.db.formulaireReponse.count({ where: { formulaire: { orgId }, completeLe: { gte: debut, lte: fin } } }),
         ctx.db.rendezVous.count({ where: { orgId, relanceEnvoyee: true, updatedAt: { gte: debut, lte: fin } } }),
         ctx.db.avisGoogle.count({ where: { orgId, dateEnvoi: { gte: debut, lte: fin } } }),
+        ctx.db.parametresClinique.findUnique({ where: { orgId }, select: { tarifMoyenConsultation: true } }),
       ])
 
+      const tarif = parametres?.tarifMoyenConsultation ?? 150
       const tauxNoShow = totalRdv > 0 ? Math.round((noShows / totalRdv) * 100) : 0
       const tauxConfirmation = totalRdv > 0 ? Math.round((confirmes / totalRdv) * 100) : 0
       const noShowsEvites = Math.max(0, confirmes - noShows)
@@ -53,7 +56,7 @@ export const rapportRouter = createTRPCRouter({
         confirmes,
         tauxConfirmation,
         noShowsEvites,
-        revenusRecuperes: noShowsEvites * 150,
+        revenusRecuperes: noShowsEvites * tarif,
         formulairesComplete,
         relancesEnvoyees,
         avisEnvoyes,
@@ -148,16 +151,20 @@ export const rapportRouter = createTRPCRouter({
       const debut = startOfMonth(new Date(annee, mois, 1))
       const fin = endOfMonth(new Date(annee, mois, 1))
 
-      const praticiens = await ctx.db.praticien.findMany({
-        where: { orgId },
-        select: { id: true, prenom: true, nom: true, couleur: true, specialite: true },
-        orderBy: { nom: "asc" },
-      })
+      const [praticiens, rdvs, parametres] = await Promise.all([
+        ctx.db.praticien.findMany({
+          where: { orgId },
+          select: { id: true, prenom: true, nom: true, couleur: true, specialite: true },
+          orderBy: { nom: "asc" },
+        }),
+        ctx.db.rendezVous.findMany({
+          where: { orgId, dateHeure: { gte: debut, lte: fin } },
+          select: { praticienId: true, statut: true, confirmeParPatient: true },
+        }),
+        ctx.db.parametresClinique.findUnique({ where: { orgId }, select: { tarifMoyenConsultation: true } }),
+      ])
 
-      const rdvs = await ctx.db.rendezVous.findMany({
-        where: { orgId, dateHeure: { gte: debut, lte: fin } },
-        select: { praticienId: true, statut: true, confirmeParPatient: true },
-      })
+      const tarif = parametres?.tarifMoyenConsultation ?? 150
 
       return praticiens.map((p) => {
         const rdvsPrat = rdvs.filter((r) => r.praticienId === p.id)
@@ -177,7 +184,7 @@ export const rapportRouter = createTRPCRouter({
           confirmes,
           tauxConfirmation: total > 0 ? Math.round((confirmes / total) * 100) : 0,
           completes,
-          revenusRecuperes: Math.max(0, confirmes - noShows) * 150,
+          revenusRecuperes: Math.max(0, confirmes - noShows) * tarif,
         }
       }).filter((p) => p.total > 0)
     }),
